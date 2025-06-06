@@ -475,6 +475,12 @@
                 "command": "cortex-debug.liveWatch.addExpr",
                 "title": "Add expression to Live Watch window",
                 "icon": "$(plus)"
+            },
+            {
+                "category": "Cortex-Debug",
+                "command": "cortex-debug.modifyRunningVariable",
+                "title": "修改运行中程序的变量值",
+                "icon": "$(edit)"
             }
         ],
         "keybindings": [
@@ -1501,9 +1507,9 @@
                                                             "description": "ITM Port Numbers",
                                                             "type": "array",
                                                             "items": {
+                                                                "type": "number",
                                                                 "maximum": 31,
-                                                                "minimum": 0,
-                                                                "type": "number"
+                                                                "minimum": 0
                                                             }
                                                         },
                                                         "type": {
