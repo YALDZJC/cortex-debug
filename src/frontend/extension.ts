@@ -77,6 +77,7 @@ export class CortexDebugExtension {
 
             vscode.commands.registerCommand('cortex-debug.resetDevice', this.resetDevice.bind(this)),
             vscode.commands.registerCommand('cortex-debug.pvtEnableDebug', this.pvtCycleDebugMode.bind(this)),
+            vscode.commands.registerCommand('cortex-debug.modifyRunningVariable', this.modifyRunningVariable.bind(this)),
 
             vscode.commands.registerCommand('cortex-debug.liveWatch.addExpr', this.addLiveWatchExpr.bind(this)),
             vscode.commands.registerCommand('cortex-debug.liveWatch.removeExpr', this.removeLiveWatchExpr.bind(this)),
@@ -145,6 +146,47 @@ export class CortexDebugExtension {
                 }
             }
             session.customRequest('reset-device', 'reset');
+        }
+    }
+
+    private async modifyRunningVariable() {
+        let session = CortexDebugExtension.getActiveCDSession();
+        if (!session) {
+            vscode.window.showErrorMessage('没有活动的调试会话');
+            return;
+        }
+
+        const varName = await vscode.window.showInputBox({
+            prompt: '输入要修改的变量名',
+            placeHolder: '例如: g_counter'
+        });
+
+        if (!varName) {
+            return;
+        }
+
+        const varValue = await vscode.window.showInputBox({
+            prompt: `输入变量 ${varName} 的新值`,
+            placeHolder: '例如: 100'
+        });
+
+        if (!varValue) {
+            return;
+        }
+
+        try {
+            const response = await session.customRequest('modify-running-variable', {
+                name: varName,
+                value: varValue
+            });
+
+            if (response.success) {
+                vscode.window.showInformationMessage(`成功修改变量 ${varName} 的值为 ${response.value}`);
+            } else {
+                vscode.window.showErrorMessage(`修改变量失败: ${response.error || '未知错误'}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`修改变量失败: ${error.message || error}`);
         }
     }
 

@@ -1253,6 +1253,11 @@ export class GDBDebugSession extends LoggingDebugSession {
                 this.swoLaunched = undefined;
                 break;
             }
+            case 'modify-running-variable': {
+                // 调用我们的方法来修改运行中程序的变量值
+                this.modifyVariableWhileRunning(response, args);
+                break;
+            }
             default:
                 response.body = { error: 'Invalid command.' };
                 this.sendResponse(response);
@@ -1990,7 +1995,7 @@ export class GDBDebugSession extends LoggingDebugSession {
                 [threadId, frameId] = decodeReference(varRef);
                 const varObj = await this.miDebugger.varCreate(varRef, '$' + name, '-', '*', threadId, frameId);
                 name = varObj?.name;
-            } else if (globOrStatic) {      // We have to resolve to the gdb variable name
+            } else if (globOrStatic) {
                 const map = this.floatingVariableMap[varRef];
                 if (map) {
                     const obj = map[name];
@@ -2025,6 +2030,55 @@ export class GDBDebugSession extends LoggingDebugSession {
             this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 11, `Could not set variable '${args.name}'\n${err}`);
+        }
+    }
+
+    /**
+     * 修改运行中程序的变量值，不需要打断点
+     * @param response 响应对象
+     * @param args 请求参数
+     */
+    protected async modifyVariableWhileRunning(response: DebugProtocol.Response, args: any): Promise<void> {
+        try {
+            // 检查程序是否正在运行
+            if (!this.miDebugger.isRunning() || this.isMIStatusStopped()) {
+                this.sendErrorResponsePub(response, 12, '程序未运行，请使用普通的变量修改方式');
+                return;
+            }
+
+            const varName = args.name;
+            const varValue = args.value;
+
+            if (!varName || !varValue) {
+                this.sendErrorResponsePub(response, 13, '变量名和值不能为空');
+                return;
+            }
+
+            // 临时中断程序执行
+            await this.miDebugger.interrupt();
+
+            try {
+                // 创建变量对象
+                const varObj = await this.miDebugger.varCreate(0, varName, '-', '@');
+
+                // 修改变量值
+                const res = await this.miDebugger.varAssign(varObj.name, varValue, -1, -1);
+
+                // 继续执行程序
+                await this.miDebugger.continue(-1);
+
+                response.body = {
+                    success: true,
+                    value: res.result('value')
+                };
+                this.sendResponse(response);
+            } catch (err) {
+                // 确保即使修改失败，程序也会继续运行
+                await this.miDebugger.continue(-1);
+                throw err;
+            }
+        } catch (err) {
+            this.sendErrorResponsePub(response, 14, `无法修改运行中的变量 '${args.name}'\n${err}`);
         }
     }
 
